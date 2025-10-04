@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Sandbox</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-color: #1e1e1e; --panel-bg: #2d2d2d; --text-color: #d4d4d4;
+            --primary-color: #00aaff; --border-color: #444; --success-color: #4CAF50;
+            --error-color: #F44336; --delete-color: #e53935; --update-color: #fb8c00;
+        }
+        body { font-family: system-ui, sans-serif; margin: 0; background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100vh; }
+        .header { padding: 10px 30px; background: var(--panel-bg); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .main-content { display: grid; grid-template-columns: 1.2fr 1.5fr 1.3fr; gap: 1px; background-color: var(--border-color); flex-grow: 1; overflow: hidden; }
+        .column { background-color: var(--panel-bg); padding: 20px; overflow-y: auto; }
+        .column h2 { margin-top: 0; border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; }
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
+        .tab-button { padding: 10px 15px; cursor: pointer; border: none; background: none; font-size: 16px; color: var(--text-color); }
+        .tab-button.active { background-color: var(--primary-color); color: #fff; font-weight: bold; border-radius: 5px 5px 0 0; }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+        .action-group { margin-bottom: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 5px; }
+        .action-group h3 { margin-top: 0; }
+        button, input[type="submit"] { background-color: var(--primary-color); color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 14px; transition: background-color 0.2s; margin-right: 5px; }
+        button:hover, input[type="submit"]:hover { filter: brightness(1.2); }
+        .update-btn { background-color: var(--update-color); } .delete-btn { background-color: var(--delete-color); }
+        #reset-data-btn { background-color: #6c757d; }
+        input[type="text"], input[type="number"] { width: calc(100% - 22px); padding: 8px 10px; margin-bottom: 10px; background-color: #3c3c3c; border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-color); }
+        pre[class*="language-"] { margin: 10px 0 !important; font-size: 13px; }
+        .task-list { list-style: none; padding: 0; }
+        .task-item { background: #3c3c3c; padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .task-item.completed { text-decoration: line-through; opacity: 0.6; }
+        .story-step p { margin: 0 0 10px 0; }
+    </style>
+</head>
+<body>
+    <header class="header"><h1>API Sandbox</h1><button id="reset-data-btn">Reset Server Data</button></header>
+    <div class="main-content">
+        <!-- COLUMN 1: CONTROLS -->
+        <div class="column">
+            <h2>Controls</h2>
+            <div class="tabs">
+                <button class="tab-button active" onclick="openTab('rest')">REST</button>
+                <button class="tab-button" onclick="openTab('graphql')">GraphQL</button>
+                <button class="tab-button" onclick="openTab('rpc')">RPC</button>
+                <button class="tab-button" onclick="openTab('soap')">SOAP</button>
+            </div>
+            
+            <!-- Universal UI for REST, GQL, RPC -->
+            <div id="controls-universal">
+                <div class="action-group"><h3><span id="api-name-create"></span>: Create Task</h3><form id="create-form"><input type="text" id="create-title" placeholder="New Task Title" required><input type="submit" value="Create"></form></div>
+                <div class="action-group"><h3><span id="api-name-manage"></span>: Manage Existing Tasks</h3><form id="manage-form"><input type="number" id="manage-id" placeholder="Enter Task ID" required><button type="submit" class="update-btn">Toggle Complete</button><button type="button" id="delete-btn" class="delete-btn">Delete</button></form></div>
+            </div>
+
+            <!-- Special UI for SOAP -->
+            <div id="controls-soap" style="display: none;">
+                <div class="action-group"><h3>SOAP: Read</h3><button id="soap-read-btn">Get All Tasks</button></div>
+                <div class="action-group"><h3>SOAP: Write (Simulated)</h3><p style="font-size: 12px; opacity: 0.8;">These buttons simulate requests. The server is read-only.</p><button id="soap-create-btn">Simulate Create</button><button id="soap-delete-btn" class="delete-btn">Simulate Delete</button></div>
+            </div>
+
+            <hr><h3>Data Rendered by Browser</h3><ul id="task-list" class="task-list"><li>Click a button to fetch data...</li></ul>
+        </div>
+
+        <!-- COLUMN 2: THE STORY -->
+        <div class="column"><h2 id="story-title">The Story of the Request</h2><div id="story-content">...</div></div>
+
+        <!-- COLUMN 3: INSPECTOR -->
+        <div class="column"><h2>Inspector</h2><h3>Request Sent</h3><div id="request-details">...</div><h3>Response Received</h3><div id="response-details">...</div></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/components/prism-graphql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/components/prism-xml.min.js"></script>
+
+    <script>
+        // --- COMPLETE CLIENT-SIDE SCRIPT ---
+        const state = { currentTab: 'rest' };
+        const storyTitleEl = document.getElementById('story-title');
+        const storyContentEl = document.getElementById('story-content');
+        const taskListEl = document.getElementById('task-list');
+        const requestDetailsEl = document.getElementById('request-details');
+        const responseDetailsEl = document.getElementById('response-details');
+
+        // --- UI LOGIC ---
+        function openTab(tabName) {
+            state.currentTab = tabName;
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.tab-button[onclick="openTab('${tabName}')"]`).classList.add('active');
+            const isSoap = tabName === 'soap';
+            document.getElementById('controls-universal').style.display = isSoap ? 'none' : 'block';
+            document.getElementById('controls-soap').style.display = isSoap ? 'block' : 'none';
+            document.getElementById('api-name-create').textContent = tabName.toUpperCase();
+            document.getElementById('api-name-manage').textContent = tabName.toUpperCase();
+            clearAll();
+            // Automatically fetch data on tab switch
+            if (actions[tabName] && actions[tabName].read) {
+                actions[tabName].read();
+            }
+        }
+        function clearAll() {
+            storyTitleEl.textContent = 'The Story of the Request';
+            storyContentEl.innerHTML = '<p>Perform an action to see the story.</p>';
+            requestDetailsEl.innerHTML = '...';
+            responseDetailsEl.innerHTML = '...';
+            taskListEl.innerHTML = '<li>...</li>';
+        }
+
+        // --- DISPLAY & RENDER LOGIC ---
+        function display(element, content, format) {
+            let code = content;
+            if (format === 'json' && typeof content === 'object') {
+                code = JSON.stringify(content, null, 2);
+            }
+            element.innerHTML = `<pre><code class="language-${format}">${Prism.highlight(code, Prism.languages[format], format)}</code></pre>`;
+        }
+        function renderTasks(tasks) {
+            if (!tasks || tasks.length === 0) {
+                taskListEl.innerHTML = '<li>No tasks found on server.</li>'; return;
+            }
+            taskListEl.innerHTML = tasks.map(task => `<li class="task-item ${task.completed ? 'completed' : ''}"><span>[ID: ${task.id}] ${task.title}</span></li>`).join('');
+        }
+
+        // --- GENERIC API CALLER ---
+        async function apiCall(url, options, story) {
+            storyContentEl.innerHTML = story;
+            display(requestDetailsEl, options.body || { Method: options.method, URL: url }, options.bodyFormat || 'json');
+            try {
+                const response = await fetch(url, options);
+                const isXml = response.headers.get('content-type')?.includes('xml');
+                const data = isXml ? await response.text() : await response.json();
+                
+                if (!response.ok) throw data; // Throw error object from server
+                
+                display(responseDetailsEl, data, isXml ? 'xml' : 'json');
+                return data;
+            } catch (error) {
+                const errorMsg = error.message || error;
+                display(responseDetailsEl, { CRITICAL_ERROR: "Could not connect or server returned an error.", Details: errorMsg }, 'json');
+                throw error;
+            }
+        }
+        
+        // --- API ACTION DEFINITIONS ---
+        const actions = {
+            rest: {
+                read: async () => {
+                    const data = await apiCall('http://localhost:3000/tasks', { method: 'GET' }, '<p>Sending a GET request to the /tasks endpoint...</p>');
+                    renderTasks(data);
+                },
+                create: async (title) => {
+                    await apiCall('http://localhost:3000/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) }, '<p>Sending a POST request to create a new task...</p>');
+                    actions.rest.read();
+                },
+                update: async (id) => {
+                    await apiCall(`http://localhost:3000/tasks/${id}`, { method: 'PUT' }, '<p>Sending a PUT request to a specific task URL to update it...</p>');
+                    actions.rest.read();
+                },
+                delete: async (id) => {
+                    await apiCall(`http://localhost:3000/tasks/${id}`, { method: 'DELETE' }, '<p>Sending a DELETE request to a specific task URL to remove it...</p>');
+                    actions.rest.read();
+                }
+            },
+            graphql: {
+                read: async () => {
+                    const query = `query { getAllTasks { id title completed } }`;
+                    const res = await apiCall('http://localhost:4000/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }), bodyFormat: 'graphql' }, '<p>Sending a GraphQL Query to fetch all tasks...</p>');
+                    renderTasks(res.data.getAllTasks);
+                },
+                create: async (title) => {
+                    const query = `mutation { createTask(title: "${title}") { id } }`;
+                    await apiCall('http://localhost:4000/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }), bodyFormat: 'graphql' }, '<p>Sending a GraphQL Mutation to create a task...</p>');
+                    actions.graphql.read();
+                },
+                update: async (id) => {
+                    const query = `mutation { updateTask(id: ${id}) { id completed } }`;
+                    await apiCall('http://localhost:4000/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }), bodyFormat: 'graphql' }, '<p>Sending a GraphQL Mutation to update a task...</p>');
+                    actions.graphql.read();
+                },
+                delete: async (id) => {
+                    const query = `mutation { deleteTask(id: ${id}) }`;
+                    await apiCall('http://localhost:4000/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }), bodyFormat: 'graphql' }, '<p>Sending a GraphQL Mutation to delete a task...</p>');
+                    actions.graphql.read();
+                }
+            },
+            rpc: {
+                read: async () => {
+                    const body = { jsonrpc: '2.0', method: 'getAllTasks', id: 1 };
+                    const res = await apiCall('http://localhost:5000/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, '<p>Calling the remote procedure `getAllTasks`...</p>');
+                    renderTasks(res.result);
+                },
+                create: async (title) => {
+                    const body = { jsonrpc: '2.0', method: 'createTask', params: [title], id: 1 };
+                    await apiCall('http://localhost:5000/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, '<p>Calling the remote procedure `createTask` with parameters...</p>');
+                    actions.rpc.read();
+                },
+                update: async (id) => {
+                    const body = { jsonrpc: '2.0', method: 'updateTask', params: [id], id: 1 };
+                    await apiCall('http://localhost:5000/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, '<p>Calling the remote procedure `updateTask` with an ID...</p>');
+                    actions.rpc.read();
+                },
+                delete: async (id) => {
+                    const body = { jsonrpc: '2.0', method: 'deleteTask', params: [id], id: 1 };
+                    await apiCall('http://localhost:5000/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, '<p>Calling the remote procedure `deleteTask` with an ID...</p>');
+                    actions.rpc.read();
+                }
+            },
+            soap: {
+                read: async () => {
+                    const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Header/><soapenv:Body><tem:GetAllTasks/></soapenv:Body></soapenv:Envelope>`;
+                    await apiCall('http://localhost:1000/tasks', { method: 'POST', headers: { 'Content-Type': 'text/xml' }, body: xmlBody, bodyFormat: 'xml' }, '<p>Sending a formal SOAP Request in an XML envelope...</p>');
+                },
+                create: () => {
+                    const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Header/><soapenv:Body><tem:CreateTask><tem:title>New Task From SOAP</tem:title></tem:CreateTask></soapenv:Body></soapenv:Envelope>`;
+                    storyContentEl.innerHTML = '<p><b>SIMULATION:</b> This shows what a SOAP Create request would look like. Our server is read-only, so this request is not actually sent.</p>';
+                    display(requestDetailsEl, xmlBody, 'xml');
+                    display(responseDetailsEl, { status: "This is a simulation. No data was sent to the server." }, 'json');
+                },
+                delete: () => {
+                    const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Header/><soapenv:Body><tem:DeleteTask><tem:id>1</tem:id></tem:DeleteTask></soapenv:Body></soapenv:Envelope>`;
+                    storyContentEl.innerHTML = '<p><b>SIMULATION:</b> This shows what a SOAP Delete request would look like. Our server is read-only, so this request is not actually sent.</p>';
+                    display(requestDetailsEl, xmlBody, 'xml');
+                    display(responseDetailsEl, { status: "This is a simulation. No data was sent to the server." }, 'json');
+                }
+            }
+        };
+        async function resetData() {
+            await apiCall('http://localhost:3000/reset', { method: 'POST' }, '<p>Sending a request to a custom REST endpoint to reset all server data to its default state.</p>');
+            openTab(state.currentTab);
+        }
+
+        // --- EVENT LISTENERS ---
+        document.getElementById('create-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const title = document.getElementById('create-title').value;
+            if (title && actions[state.currentTab] && actions[state.currentTab].create) {
+                actions[state.currentTab].create(title);
+                e.target.reset();
+            }
+        });
+        document.getElementById('manage-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('manage-id').value);
+            if (id && actions[state.currentTab] && actions[state.currentTab].update) {
+                actions[state.currentTab].update(id);
+            }
+        });
+        document.getElementById('delete-btn').addEventListener('click', () => {
+            const id = parseInt(document.getElementById('manage-id').value);
+            if (id && actions[state.currentTab] && actions[state.currentTab].delete) {
+                actions[state.currentTab].delete(id);
+            }
+        });
+        document.getElementById('soap-read-btn').addEventListener('click', actions.soap.read);
+        document.getElementById('soap-create-btn').addEventListener('click', actions.soap.create);
+        document.getElementById('soap-delete-btn').addEventListener('click', actions.soap.delete);
+        document.getElementById('reset-data-btn').addEventListener('click', resetData);
+
+        // Initial Load
+        openTab('rest');
+    </script>
+</body>
+</html>
