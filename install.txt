@@ -1,0 +1,17 @@
+first into your terminal install this 
+
+npm install express cors body-parser graphql express-graphql xml-js
+
+then open your html files ?? index.html 
+
+open a terminal used multiple terminal at once split terminal then run 
+
+then run the servers using 
+node graphql-server.js
+node rest-server.js
+node rpc-server.js
+node soap-server.js
+
+
+then into index.html it will work propely 
+
